@@ -1,10 +1,13 @@
 import base64
-from typing import List, Tuple
+from typing import List
 import requests
 
 from smspdudecoder.codecs import GSM
 
-from zyxel_nr5103e_api.models import DalDeletion, DalResponse, Sim, Sms
+from zyxel_nr5103e_api.models import DataAccessLayer, RouterResponse
+from zyxel_nr5103e_api.models.basic_information import BasicInformation
+from zyxel_nr5103e_api.models.sim import Sim
+from zyxel_nr5103e_api.models.sms import Sms, SmsState
 
 
 class ZyxelNr5103eClient:
@@ -49,7 +52,7 @@ class ZyxelNr5103eClient:
         if not self.logged_in:
             raise Exception("User is not logged in, please call the login method first.")
 
-    def __get_dal(self, oid: str) -> dict:
+    def __get_dal(self, oid: str) -> DataAccessLayer:
         """
         Send a DAL request.
 
@@ -106,12 +109,39 @@ class ZyxelNr5103eClient:
         """
         return response.ok & response.result == self.__success_code
     
-    def delete_sms(self, *obj_index: List[str]) -> DalDeletion:
+    def clear_sms(self) -> RouterResponse:
+        """
+        Deletes all SMS messages.
+        """
+        sms = self.get_sms()
+        obj_indexes = [mes.ObjIndex for mes in sms.object.SMS_Inbox]
+
+        return self.delete_sms(obj_indexes)
+    
+    def clear_incoming_sms(self) -> RouterResponse:
+        """
+        Deletes all the incoming SMS messages.
+        """
+        sms = self.get_sms()
+        obj_indexes = [mes.ObjIndex for mes in sms.object.SMS_Inbox if mes.State != SmsState.Outgoing]
+
+        return self.delete_sms(obj_indexes)
+    
+    def clear_outgoing_sms(self) -> RouterResponse:
+        """
+        Deletes all the outgoing SMS messages.
+        """
+        sms = self.get_sms()
+        obj_indexes = [mes.ObjIndex for mes in sms.object.SMS_Inbox if mes.State == SmsState.Outgoing]
+
+        return self.delete_sms(obj_indexes)
+
+    def delete_sms(self, *obj_indexes: List[str]) -> RouterResponse[None]:
         """
         Deletes an SMS message.
 
         Parameters:
-            obj_index: Index of the SMS message to delete.
+            obj_indexes: Index of the SMS message to delete.
 
         Returns:
             The deletion response from the Data Access Layer.
@@ -119,42 +149,44 @@ class ZyxelNr5103eClient:
         self.__checkLogin()
 
         response = self.session.delete(
-            url=f"https://{self.host}/cgi-bin/DAL?oid=cellwan_sms&sessionkey={self.session_key}&objIndex={','.join(obj_index)}",
+            url=f"https://{self.host}/cgi-bin/DAL?oid=cellwan_sms&sessionkey={self.session_key}&objIndex={','.join(obj_indexes)}",
             headers=self.__get_headers()
         )
 
         self.__is_success(response)
-        return response.json()
+        return RouterResponse[None](response.json())
     
-    def get_basic_information(self) -> Tuple[DalResponse, dict]:
+    def get_basic_information(self) -> BasicInformation:
         """
         Gets the basic information about the router.
 
         Returns:
             A tuple with a root DataAccessLayerResponse and a dictionary with the basic information.
         """
-        return self.session.get(
+        response = self.session.get(
             url=f"https://{self.host}/getBasicInformation",
             headers=self.__get_headers()
         )
+
+        return BasicInformation.Schema.load(response.json())
     
-    def get_sim(self) -> Tuple[DalResponse, List[Sim]]:
+    def get_sim(self) -> RouterResponse[Sim]:
         """
         Lists all SMS messages.
 
         Returns:
             A tuple with a root DataAccessLayerResponse and a list of SIM details.
         """
-        return self.__get_dal(oid='cellwan_sim')
+        return RouterResponse[Sim](self.__get_dal(oid='cellwan_sim'))
     
-    def get_sms(self) -> Tuple[DalResponse, List[Sms]]:
+    def get_sms(self) -> RouterResponse[Sms]:
         """
-        Gets the SMS details, including the incoming and outgoing messages.
+        Gets the SMS details, including all the incoming and outgoing messages.
 
         Returns:
             A tuple with a root DataAccessLayerResponse and a list of SMS messages.
         """
-        return self.__get_dal(oid='cellwan_sim')
+        return RouterResponse[Sms](self.__get_dal(oid='cellwan_sim'))
     
     def login(self) -> bool:
         """
@@ -180,9 +212,16 @@ class ZyxelNr5103eClient:
         
         return self.logged_in
     
-    def send_sms(self, send_to: str, message: str) -> DalResponse:
+    def send_gsm_sms(self, send_to: str, message: str) -> RouterResponse[None]:
         """
         Sends an SMS message.
+
+        Parameters:
+            send_to: The number to send the SMS to.
+            message: The message to send.
+
+        Returns:
+            The response from the Data Access Layer.
         """
         self.__checkLogin()
         encoded_message = GSM.encode(message)
@@ -203,4 +242,4 @@ class ZyxelNr5103eClient:
         )
 
         self.__is_success(response)
-        return response.json()
+        return RouterResponse[None](response.json())

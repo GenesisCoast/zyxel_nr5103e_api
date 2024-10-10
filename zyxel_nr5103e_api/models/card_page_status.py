@@ -1,10 +1,7 @@
 from dataclasses import dataclass
-from typing import List
 
 from marshmallow_dataclass import dataclass, fields
 from marshmallow import Schema
-
-from zyxel_nr5103e_api.enums import Languages, SmsState
 
 
 @dataclass
@@ -49,6 +46,7 @@ class CellIntfSimfInfo:
     X_ZYXEL_PIN_STATE = fields.Str
     X_ZYXEL_PIN_RemainingAttempts = fields.Int
     X_ZYXEL_PUK_RemainingAttempts = fields.Int
+    Schema = Schema
 
 
 @dataclass
@@ -59,6 +57,7 @@ class CellIntfZyIpPassthruInfo:
     Enable = fields.Bool
     ConnectionMode = fields.Str
     MACAddress = fields.Str
+    Schema = Schema
 
 
 @dataclass
@@ -76,6 +75,7 @@ class CellIntfZyNrNsaInfo:
     RSRP = fields.Int
     RSRQ = fields.Int
     SINR = fields.Int
+    Schema = Schema
 
 
 @dataclass
@@ -91,6 +91,7 @@ class RouterInfo:
     X_ZYXEL_ActiveDefaultGateway = fields.Str
     X_ZYXEL_ActiveV6DefaultGateway = fields.Str
     X_ZYXEL_AutoSecureDefaultIface = fields.Bool
+    Schema = Schema
 
 
 @dataclass
@@ -143,6 +144,7 @@ class CellIntfInfo:
     X_ZYXEL_MaxDataRateDownlink = fields.Str
     X_ZYXEL_MaxDataRateReset = fields.Bool
     X_ZYXEL_MaxDataRatePeriod = fields.Int
+    Schema = Schema
 
 
 @dataclass
@@ -157,6 +159,7 @@ class GponStatsInfo:
     SFP_Model = fields.Str
     SFP_Serial = fields.Str
     SFP_Presence = fields.Bool
+    Schema = Schema
 
 
 @dataclass
@@ -180,6 +183,7 @@ class LanInfo:
     X_ZYXEL_LanPort = fields.Str
     X_ZYXEL_SwitchToWAN = fields.Bool,
     X_ZYXEL_Upstream = fields.Bool
+    Schema = Schema
 
 
 @dataclass
@@ -195,6 +199,7 @@ class WWANStatsInfo:
     Model = fields.Str
     FWVersion = fields.Str
     SIMIMSI = fields.Str
+    Schema = Schema
 
 
 @dataclass
@@ -236,6 +241,7 @@ class Dhcp4SerPoolInfo:
     StaticAddressNumberOfEntries = fields.Int
     OptionNumberOfEntries = fields.Int
     ClientNumberOfEntries = fields.Int
+    Schema = Schema
 
 
 @dataclass
@@ -259,6 +265,7 @@ class WiFiInfo:
     ModeEnabled = fields.Str
     WPSEnable = fields.Bool
     LastChange = fields.Int
+    Schema = Schema
 
 
 @dataclass
@@ -268,6 +275,7 @@ class LanPortInfo:
     """
     LanMac = fields.Str
     ethPortExist = fields.Bool
+    Schema = Schema
 
 
 @dataclass
@@ -299,6 +307,7 @@ class DeviceInfo:
     LocationNumberOfEntries = fields.Int
     PackageVersion = fields.Str
     ModuleSoftwareVersion = fields.Str
+    Schema = Schema
 
     
 @dataclass
@@ -316,6 +325,7 @@ class Ipv4Address:
     X_ZYXEL_Dhcp4Subnet_Ref = fields.Str
     X_ZYXEL_IfName = fields.Str
     ipIfaceIdx = fields.Int
+    Schema = Schema
 
 
 @dataclass
@@ -333,6 +343,7 @@ class DnsServer:
     X_ZYXEL_Ifname = fields.Str
     X_ZYXEL_GwAddr = fields.Str
     X_ZYXEL_DNSSearchList = fields.Str
+    Schema = Schema
 
     def get_dns_server(self, obj) -> List[str]:
         return obj.DNSServer.split(",")
@@ -377,95 +388,4 @@ class WanLanInfo:
     BridgingBrPath = fields.Str
     Group_WAN_IpIface = fields.Str
     DHCPStatus = fields.Str
-
-
-
-@dataclass
-class BasicInformation:
-    """
-    Basic information about the router.
-    """
-    result = fields.String(required=True)
-    ModelName = fields.String(required=True)
-    SoftwareVersion = fields.String(required=True)
-    CurrentLanguage = fields.Enum(Languages)
-    AvailableLanguages = fields.String(required=True)
-    RememberPassword = fields.Boolean()
-    RemoAddr_Type = fields.String(required=True)
-    AppCustomization = fields.Int(required=True)
-
-
-@dataclass
-class DalResponse:
-    """
-    Data access layer (DAL) response.
-    """
-    result = fields.String(required=True)
-    ReplyMsg = fields.String(required=True)
-    ReplyMsgMultiLang = fields.String(required=False)
-    Object = fields.List(fields.Nested(fields.Dict), required=False)
-    sessionKey = fields.String(required=False)
-    Schema = Schema
-
-
-@dataclass
-class Sim:
-    """
-    Details on the SIM card.
-    """
-    USIM_Status = fields.Str
-    USIM_IMSI = fields.Str
-    USIM_ICCID = fields.Str
-    USIM_Auto_Unlock = fields.Bool
-    USIM_PIN_Protection = fields.Bool
-    USIM_PIN_STATE = fields.Str
-    USIM_PIN_RemainingAttempts = fields.Int
-    USIM_PUK_RemainingAttempts = fields.Int
-    Schema = Schema
-
-
-@dataclass
-class SmsMessage:
-    """
-    SMS message in the inbox.
-    """
-    ObjIndex = fields.Int
-    MsgIndex = fields.Int
-    MsgID = fields.Str
-    State = fields.Enum(SmsState)
-    FromType = fields.Int
-    From = fields.Method(serialize="get_from", deserialize="set_from")
-    TimeStamp = fields.Str
-    CharacterSet = fields.Int
-    Content = fields.Method(serialize="get_content", deserialize="set_content")
-    Schema = Schema
-
-    def get_content(self, obj):
-        return obj.Content.encode("utf-8").hex()
-
-    def set_content(self, obj):
-        return bytes.fromhex(obj.Content).decode("utf-8")
-    
-    def get_from(self, obj):
-        if any(c.isalpha() for c in obj.Content):
-            return obj.From.encode("utf-8").hex()
-        else:
-            return obj.From
-
-    def set_from(self, obj):
-        if any(c.isalpha() for c in obj.Content):
-            return bytes.fromhex(obj.From).decode("utf-8")
-        else:
-            return obj.From
-
-
-@dataclass
-class Sms:
-    """
-    The WAN SMS message details (overall configuration).
-    """
-    SMS_Enable = fields.Bool
-    SMS_UsedSpace = fields.Int
-    SMS_TotalSpace = fields.Int
-    SMS_Inbox = fields.List(fields.Nested(SmsMessage))
     Schema = Schema
